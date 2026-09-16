@@ -1,0 +1,32 @@
+{
+  "name": "tocaoluadao",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "tsx server/index.ts",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "bcryptjs": "^3.0.3",
+    "concurrently": "latest",
+    "cors": "latest",
+    "express": "latest",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/cors": "latest",
+    "@types/express": "latest",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  }
+}
