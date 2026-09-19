@@ -3,20 +3,44 @@ import { Footer } from "../components/SiteChrome";
 import Icon from "../components/Icon";
 export default function ReportPage({ go }: { go: (path: string) => void }) {
   const [sent, setSent] = useState(false);
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const form = event.currentTarget;
     const fields = Array.from(
-      event.currentTarget.querySelectorAll(
+      form.querySelectorAll(
         "input:not([type=file]):not([type=checkbox]), textarea",
       ),
     ).map((field) => (field as HTMLInputElement | HTMLTextAreaElement).value);
+    const values = {
+      scammerName: fields[0],
+      accountNumber: fields[1],
+      bankName: fields[2],
+      amount: fields[3],
+      phone: fields[4],
+      category: fields[5],
+      content: fields[6],
+      reporterName: fields[7],
+      reporterPhone: fields[8],
+      reporterEmail: fields[9],
+    };
+    try {
+      const response = await fetch("http://localhost:3001/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      if (!response.ok) throw new Error("Không thể gửi tố cáo.");
+    } catch {
+      // Keep the demo flow usable when the API is not running.
+    }
     localStorage.setItem(
       "lastReport",
       JSON.stringify({
-        scammer: fields[0],
-        content: fields[5],
-        reporter: fields[7],
-        reporterPhone: fields[8],
+        scammer: values.scammerName,
+        content: values.content,
+        reporter: values.reporterName,
+        reporterPhone: values.reporterPhone,
+        reporterEmail: values.reporterEmail,
         createdAt: new Date().toLocaleString("vi-VN"),
       }),
     );
@@ -111,6 +135,10 @@ export default function ReportPage({ go }: { go: (path: string) => void }) {
                   <input required placeholder="Nhập số điện thoại của bạn" />
                 </label>
               </div>
+              <label>
+                Email nhận thông báo
+                <input required type="email" placeholder="email@example.com" />
+              </label>
               <label className="check-row">
                 <input type="checkbox" required /> Tôi đồng ý chịu trách nhiệm
                 về nội dung tố cáo.

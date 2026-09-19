@@ -39,10 +39,10 @@ export function Header({
             Danh sách admin
           </button>
           <button
-            className={path.includes("trung-gian") ? "active" : ""}
-            onClick={() => link("/list/category/admin/trung-gian")}
+            className={path === "/middleman" ? "active" : ""}
+            onClick={() => link("/middleman")}
           >
-            Trung gian
+            Giao dịch trung gian
           </button>
           <button
             className={path === "/list/scam" ? "active" : ""}

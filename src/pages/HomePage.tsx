@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import Icon from "../components/Icon";
 import { Footer } from "../components/SiteChrome";
-import { scamRows, slugify } from "../data/scams";
+import { slugify } from "../data/scams";
+type ScamItem = {
+  name: string;
+  amount: string;
+  phone?: string;
+  account: string;
+  bank: string;
+  views: number | string;
+  date: string;
+};
 const assets = [
   "image_56771365.png",
   "image_27055372.jpg",
@@ -44,7 +53,7 @@ const names = [
   "LOL",
   "Thiết Kế WEB",
 ];
-function Table({ go }: { go: (path: string) => void }) {
+function Table({ go, rows }: { go: (path: string) => void; rows: ScamItem[] }) {
   return (
     <div className="table-wrap">
       <table>
@@ -60,27 +69,27 @@ function Table({ go }: { go: (path: string) => void }) {
           </tr>
         </thead>
         <tbody>
-          {scamRows.slice(0, 5).map((row) => (
-            <tr key={row[0]}>
+          {rows.slice(0, 5).map((row) => (
+            <tr key={`${row.name}-${row.account}`}>
               <td>
                 <b>
                   <span className="person-mark">●</span>
                   <button
                     className="scam-name"
-                    onClick={() => go(`/scam/${slugify(row[0])}`)}
+                    onClick={() => go(`/scam/${slugify(row.name)}`)}
                   >
-                    {row[0]}
+                    {row.name}
                   </button>
                 </b>
               </td>
-              <td className="amount">{row[1]}</td>
-              <td className="mono">{row[2]}</td>
-              <td className="mono">{row[3]}</td>
+              <td className="amount">{row.amount}</td>
+              <td className="mono">{row.phone || "—"}</td>
+              <td className="mono">{row.account}</td>
               <td>
-                <span className="bank">{row[4]}</span>
+                <span className="bank">{row.bank}</span>
               </td>
-              <td>{row[5]} lượt xem</td>
-              <td>{row[6]}</td>
+              <td>{row.views} lượt xem</td>
+              <td>{row.date}</td>
             </tr>
           ))}
         </tbody>
@@ -92,20 +101,23 @@ export default function HomePage({ go }: { go: (path: string) => void }) {
   const [dbCategories, setDbCategories] = useState<
     Array<{ id: number; name: string; slug: string; imageUrl: string | null }>
   >([]);
+  const [scams, setScams] = useState<ScamItem[]>([]);
+  const [stats, setStats] = useState({ total: 0, pending: 0, comments: 0 });
   useEffect(() => {
     fetch("http://localhost:3001/api/categories")
       .then((response) => response.json())
       .then(setDbCategories)
       .catch(() => {});
+    fetch("http://localhost:3001/api/scams")
+      .then((response) => response.json())
+      .then((data) => setScams(Array.isArray(data) ? data : []))
+      .catch(() => setScams([]));
+    fetch("http://localhost:3001/api/stats")
+      .then((response) => response.json())
+      .then((data) => setStats(data))
+      .catch(() => {});
   }, []);
-  const categoryItems = dbCategories.length
-    ? dbCategories
-    : names.map((name, index) => ({
-        id: index,
-        name,
-        slug: name.toLowerCase().replace(/[^a-z0-9]+/gi, "-"),
-        imageUrl: `/assets/${assets[index]}`,
-      }));
+  const categoryItems = dbCategories;
   return (
     <>
       <main>
@@ -159,19 +171,19 @@ export default function HomePage({ go }: { go: (path: string) => void }) {
         <section className="container">
           <div className="stats">
             <div>
-              <strong>57</strong>
+              <strong>{stats.total}</strong>
               <span>Tài khoản cảnh báo</span>
             </div>
             <div>
-              <strong>57</strong>
+              <strong>{stats.total}</strong>
               <span>Hồ sơ lừa đảo</span>
             </div>
             <div>
-              <strong>38</strong>
+              <strong>{stats.comments}</strong>
               <span>Bình luận cộng đồng</span>
             </div>
             <div>
-              <strong>06</strong>
+              <strong>{String(stats.pending).padStart(2, "0")}</strong>
               <span>Tố cáo chờ duyệt</span>
             </div>
           </div>
@@ -186,7 +198,7 @@ export default function HomePage({ go }: { go: (path: string) => void }) {
               Xem tất cả <Icon name="arrow" size={16} />
             </button>
           </div>
-          <Table go={go} />
+          <Table go={go} rows={scams} />
         </section>
         <section className="category-showcase">
           <div className="container">
@@ -206,7 +218,7 @@ export default function HomePage({ go }: { go: (path: string) => void }) {
                   onClick={() => go(`/list/category/admin/${category.slug}`)}
                 >
                   <img
-                    src={category.imageUrl ?? `/assets/${assets[category.id]}`}
+                    src={category.imageUrl || ""}
                     alt={category.name}
                     loading="lazy"
                   />

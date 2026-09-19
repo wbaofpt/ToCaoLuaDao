@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import Icon from "../components/Icon";
 import { Footer } from "../components/SiteChrome";
-import { scamRows, adminNames, categories, slugify } from "../data/scams";
-function Table({ go }: { go: (path: string) => void }) {
+import { slugify } from "../data/scams";
+import { filterScams, paginate, type ScamListRow } from "../utils/scams";
+
+function Table({ go, rows }: { go: (path: string) => void; rows: ScamListRow[] }) {
   return (
     <div className="table-wrap">
       <table>
@@ -18,27 +20,27 @@ function Table({ go }: { go: (path: string) => void }) {
           </tr>
         </thead>
         <tbody>
-          {scamRows.map((row) => (
-            <tr key={row[0]}>
+          {rows.map((row) => (
+            <tr key={`${row.name}-${row.account}`}>
               <td>
                 <b>
                   <span className="person-mark">●</span>
                   <button
                     className="scam-name"
-                    onClick={() => go(`/scam/${slugify(row[0])}`)}
+                    onClick={() => go(`/scam/${slugify(row.name)}`)}
                   >
-                    {row[0]}
+                    {row.name}
                   </button>
                 </b>
               </td>
-              <td className="amount">{row[1]}</td>
-              <td className="mono">{row[2]}</td>
-              <td className="mono">{row[3]}</td>
+              <td className="amount">{row.amount}</td>
+              <td className="mono">{row.phone}</td>
+              <td className="mono">{row.account}</td>
               <td>
-                <span className="bank">{row[4]}</span>
+                <span className="bank">{row.bank}</span>
               </td>
-              <td>{row[5]} lượt xem</td>
-              <td>{row[6]}</td>
+              <td>{row.views} lượt xem</td>
+              <td>{row.date}</td>
             </tr>
           ))}
         </tbody>
@@ -55,18 +57,43 @@ export default function ScamListPage({
 }) {
   const isScam = path === "/list/scam";
   const middleman = path.includes("trung-gian");
-  const selectedSlug = path.includes("/category/admin/")
+  const routeSlug = path.includes("/category/admin/")
     ? path.split("/category/admin/")[1]
-    : middleman
+    : "";
+  const selectedSlug =
+    routeSlug === "trung-gian"
       ? "gd-trung-gian"
-      : "";
+      : routeSlug || (middleman ? "gd-trung-gian" : "");
   const [dbCategories, setDbCategories] = useState<
     Array<{ id: number; name: string; slug: string }>
   >([]);
   const [dbAdmins, setDbAdmins] = useState<
-    Array<{ id: number; name: string; category: string }>
+    Array<{
+      id: number;
+      name: string;
+      slug: string;
+      avatarUrl?: string;
+      category: string;
+    }>
   >([]);
+  const [adminsLoaded, setAdminsLoaded] = useState(false);
+  const [scamSearch, setScamSearch] = useState("");
+  const [bankFilter, setBankFilter] = useState("all");
+  const [scamPage, setScamPage] = useState(1);
+  const [scams, setScams] = useState<ScamListRow[]>([]);
+  const [scamsLoaded, setScamsLoaded] = useState(false);
   useEffect(() => {
+    if (!isScam) return;
+    setScamsLoaded(false);
+    fetch("http://localhost:3001/api/scams")
+      .then((response) => response.json())
+      .then((data) => setScams(Array.isArray(data) ? data : []))
+      .catch(() => setScams([]))
+      .finally(() => setScamsLoaded(true));
+  }, [isScam]);
+  useEffect(() => {
+    setDbAdmins([]);
+    setAdminsLoaded(false);
     if (!isScam) {
       fetch("http://localhost:3001/api/categories")
         .then((response) => response.json())
@@ -74,22 +101,27 @@ export default function ScamListPage({
         .catch(() => {});
       fetch(`http://localhost:3001/api/admins?category=${selectedSlug}`)
         .then((response) => response.json())
-        .then(setDbAdmins)
-        .catch(() => {});
+        .then((admins) => setDbAdmins(admins))
+        .catch(() => setDbAdmins([]))
+        .finally(() => setAdminsLoaded(true));
     }
   }, [isScam, selectedSlug]);
-  const categoryItems = dbCategories.length
-    ? dbCategories
-    : categories.map((name, id) => ({
-        id,
-        name,
-        slug: name.toLowerCase().replace(/[^a-z0-9]+/gi, "-"),
-      }));
-  const adminItems = dbAdmins.length
-    ? dbAdmins.map((admin) => admin.name)
-    : middleman
-      ? adminNames.slice(0, 6)
-      : adminNames;
+  const categoryItems = [{ id: 0, name: "Tất cả", slug: "" }, ...dbCategories];
+  const adminItems: Array<{
+    id: number;
+    name: string;
+    slug: string;
+    avatarUrl?: string;
+    category: string;
+  }> = adminsLoaded ? dbAdmins : [];
+  const bankOptions = Array.from(new Set(scams.map((row) => row.bank)));
+  const filteredScams = filterScams(scams, scamSearch, bankFilter);
+  const scamPageSize = 20;
+  const scamPageCount = Math.max(
+    1,
+    Math.ceil(filteredScams.length / scamPageSize),
+  );
+  const visibleScams = paginate(filteredScams, scamPage, scamPageSize);
   return (
     <>
       <main className="page-main container">
@@ -114,7 +146,13 @@ export default function ScamListPage({
               <button
                 key={item.id}
                 className={selectedSlug === item.slug ? "selected" : ""}
-                onClick={() => go(`/list/category/admin/${item.slug}`)}
+                onClick={() =>
+                  go(
+                    item.slug
+                      ? `/list/category/admin/${item.slug}`
+                      : "/list/admin",
+                  )
+                }
               >
                 {item.name}
               </button>
@@ -122,7 +160,94 @@ export default function ScamListPage({
           </div>
         )}
         {isScam ? (
-          <Table go={go} />
+          <>
+            <div className="scam-filters">
+              <div className="scam-search">
+                <Icon name="search" size={18} />
+                <input
+                  value={scamSearch}
+                  onChange={(event) => {
+                    setScamSearch(event.target.value);
+                    setScamPage(1);
+                  }}
+                  placeholder="Tìm tên, SĐT, số tài khoản, ngân hàng..."
+                  aria-label="Tìm kiếm cảnh báo scam"
+                />
+              </div>
+              <select
+                value={bankFilter}
+                onChange={(event) => {
+                  setBankFilter(event.target.value);
+                  setScamPage(1);
+                }}
+                aria-label="Lọc theo ngân hàng"
+              >
+                <option value="all">Tất cả ngân hàng</option>
+                {bankOptions.map((bank) => (
+                  <option value={bank} key={bank}>
+                    {bank}
+                  </option>
+                ))}
+              </select>
+              {(scamSearch || bankFilter !== "all") && (
+                <button
+                  className="clear-filter"
+                  onClick={() => {
+                    setScamSearch("");
+                    setBankFilter("all");
+                    setScamPage(1);
+                  }}
+                >
+                  Xóa lọc
+                </button>
+              )}
+            </div>
+            <div className="filter-result">
+              Hiển thị {filteredScams.length} cảnh báo
+            </div>
+            {filteredScams.length ? (
+              <>
+                <Table go={go} rows={visibleScams} />
+                {
+                  <nav
+                    className="pagination"
+                    aria-label="Phân trang danh sách scam"
+                  >
+                    <button
+                      disabled={scamPage === 1}
+                      onClick={() => setScamPage((page) => page - 1)}
+                    >
+                      ← Trước
+                    </button>
+                    {Array.from(
+                      { length: scamPageCount },
+                      (_, index) => index + 1,
+                    ).map((page) => (
+                      <button
+                        className={page === scamPage ? "active" : ""}
+                        key={page}
+                        onClick={() => setScamPage(page)}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      disabled={scamPage === scamPageCount}
+                      onClick={() => setScamPage((page) => page + 1)}
+                    >
+                      Sau →
+                    </button>
+                  </nav>
+                }
+              </>
+            ) : (
+              <div className="empty-list">
+                {scamsLoaded
+                  ? "Không tìm thấy cảnh báo phù hợp."
+                  : "Đang tải dữ liệu cảnh báo từ database..."}
+              </div>
+            )}
+          </>
         ) : (
           <>
             <div className="list-label">
@@ -130,29 +255,53 @@ export default function ScamListPage({
               <small>Được cộng đồng tin chọn</small>
             </div>
             <div className="admin-grid">
-              {adminItems.map((name, i) => (
-                <article className="admin-card" key={name}>
+              {!adminsLoaded && (
+                <div className="empty-list">Đang tải danh sách admin...</div>
+              )}
+              {adminItems.map((admin, i) => (
+                <article
+                  className="admin-card"
+                  key={admin.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => go(`/admin/${admin.slug}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ")
+                      go(`/admin/${admin.slug}`);
+                  }}
+                >
                   <div className="avatar">
-                    {name
-                      .split(" ")
-                      .map((v) => v[0])
-                      .slice(-2)
-                      .join("")}
+                    {admin.avatarUrl ? (
+                      <img src={admin.avatarUrl} alt={admin.name} />
+                    ) : (
+                      <span>
+                        {admin.name
+                          .split(" ")
+                          .filter(Boolean)
+                          .map((part) => part[0])
+                          .join("")}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <span className="verified">
                       <Icon name="check" size={13} /> Đã xác thực
                     </span>
-                    <h3>{name}</h3>
+                    <h3>{admin.name}</h3>
                     <p>
                       {middleman
                         ? "Giao dịch trung gian · Đang hoạt động"
-                        : `Giao dịch viên · ${i % 2 ? "Dịch vụ Game" : "GD trung gian"}`}
+                        : `Giao dịch viên · ${admin.category || "Chưa phân loại"}`}
                     </p>
                   </div>
                   <Icon name="arrow" size={17} />
                 </article>
               ))}
+              {adminsLoaded && adminItems.length === 0 && (
+                <div className="empty-list">
+                  Chưa có admin trong danh mục này.
+                </div>
+              )}
             </div>
           </>
         )}

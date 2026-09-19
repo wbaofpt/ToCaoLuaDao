@@ -5,23 +5,15 @@ import ScamListPage from "./pages/ScamListPage";
 import ScamDetailPage from "./pages/ScamDetailPage";
 import ReportPage from "./pages/ReportPage";
 import InfoPage from "./pages/InfoPage";
-import AdminPage, { AdminLoginPage } from "./pages/AdminPage";
-
-function pageFor(path: string) {
-  if (path === "/admin/login") return "admin-login";
-  if (path === "/admin") return "admin";
-  if (path.startsWith("/scam/")) return "detail";
-  if (path === "/") return "home";
-  if (
-    path === "/list/admin" ||
-    path.includes("/trung-gian") ||
-    path.includes("/category/admin/")
-  )
-    return "admins";
-  if (path === "/list/scam") return "scams";
-  if (path === "/report/scam") return "report";
-  return "info";
-}
+import AdminLoginPage from "./pages/admin/AdminLoginPage";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import AdminProfilePage from "./pages/admin/AdminProfilePage";
+import AdminDetailPage from "./pages/admin/AdminDetailPage";
+import MiddlemanPage from "./pages/MiddlemanPage";
+import MiddlemanProcessPage from "./pages/MiddlemanProcessPage";
+import ScamToast from "./components/ScamToast";
+import AdminRegistrationPage from "./pages/AdminRegistrationPage";
+import { pageFor } from "./routing";
 export default function App() {
   const [path, setPath] = useState(window.location.pathname);
   const go = (next: string) => {
@@ -33,10 +25,13 @@ export default function App() {
   const page = pageFor(path);
   return (
     <>
-      {page !== "admin" && page !== "admin-login" && (
-        <Header path={path} go={go} />
-      )}
+      {page !== "admin" &&
+        page !== "admin-login" &&
+        page !== "admin-profile" && <Header path={path} go={go} />}
       {page === "home" && <HomePage go={go} />}
+      {page === "middlemen" && <MiddlemanPage go={go} />}
+      {page === "middleman-process" && <MiddlemanProcessPage go={go} />}
+      {page === "admin-register" && <AdminRegistrationPage go={go} />}
       {(page === "admins" || page === "scams") && (
         <ScamListPage path={path} go={go} />
       )}
@@ -45,7 +40,11 @@ export default function App() {
       )}
       {page === "report" && <ReportPage go={go} />}
       {page === "admin-login" && <AdminLoginPage go={go} />}
-      {page === "admin" && <AdminPage go={go} />}
+      {page === "admin" && <AdminDashboardPage go={go} />}
+      {page === "admin-profile" && <AdminProfilePage go={go} />}
+      {page === "admin-detail" && (
+        <AdminDetailPage slug={path.slice("/admin/".length)} go={go} />
+      )}
       {page === "info" && (
         <InfoPage
           title={
@@ -54,8 +53,15 @@ export default function App() {
               : "Thông tin & chính sách"
           }
           go={go}
+          registration={path.includes("tham-gia")}
         />
       )}
+      <ScamToast
+        go={go}
+        enabled={
+          page !== "admin" && page !== "admin-login" && page !== "admin-profile"
+        }
+      />
     </>
   );
 }

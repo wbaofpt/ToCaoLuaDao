@@ -7,7 +7,8 @@ export type IconName =
   | "flag"
   | "menu"
   | "x"
-  | "chevron";
+  | "chevron"
+  | "alert";
 const paths: Record<IconName, string> = {
   search: "M11 4a7 7 0 1 0 4.95 11.95L21 21m-6-6 6 6",
   shield: "M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Zm-3 9 2 2 4-4",
@@ -19,6 +20,7 @@ const paths: Record<IconName, string> = {
   menu: "M4 6h16M4 12h16M4 18h16",
   x: "M6 6l12 12M18 6 6 18",
   chevron: "m6 9 6 6 6-6",
+  alert: "M12 3 2.7 20h18.6L12 3Zm0 6v5m0 3h.01",
 };
 export default function Icon({
   name,
