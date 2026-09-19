@@ -19,9 +19,21 @@ function getTheme(subject: string): EmailTheme {
 export function renderStatusEmail(subject: string, text: string) {
   const theme = getTheme(subject);
   const config = {
-    pending: { label: "Đang chờ xử lý", color: "#b26b00", background: "#fff5dc" },
-    approved: { label: "Đã được duyệt", color: "#16835f", background: "#e7faf3" },
-    rejected: { label: "Chưa được duyệt", color: "#d92245", background: "#fff0f2" },
+    pending: {
+      label: "Đang chờ xử lý",
+      color: "#b26b00",
+      background: "#fff5dc",
+    },
+    approved: {
+      label: "Đã được duyệt",
+      color: "#16835f",
+      background: "#e7faf3",
+    },
+    rejected: {
+      label: "Chưa được duyệt",
+      color: "#d92245",
+      background: "#fff0f2",
+    },
   }[theme];
   const paragraphs = text
     .split(/\n+/)

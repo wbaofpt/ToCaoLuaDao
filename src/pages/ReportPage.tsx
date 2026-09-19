@@ -1,8 +1,19 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Footer } from "../components/SiteChrome";
 import Icon from "../components/Icon";
 export default function ReportPage({ go }: { go: (path: string) => void }) {
   const [sent, setSent] = useState(false);
+  const [evidence, setEvidence] = useState<
+    Array<{ file: File; preview: string }>
+  >([]);
+  const evidenceRef = useRef(evidence);
+  evidenceRef.current = evidence;
+  useEffect(
+    () => () => {
+      evidenceRef.current.forEach((item) => URL.revokeObjectURL(item.preview));
+    },
+    [],
+  );
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -24,10 +35,14 @@ export default function ReportPage({ go }: { go: (path: string) => void }) {
       reporterEmail: fields[9],
     };
     try {
+      const payload = new FormData();
+      Object.entries(values).forEach(([key, value]) => {
+        if (typeof value === "string") payload.append(key, value);
+      });
+      evidence.forEach((item) => payload.append("evidence", item.file));
       const response = await fetch("http://localhost:3001/api/reports", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: payload,
       });
       if (!response.ok) throw new Error("Không thể gửi tố cáo.");
     } catch {
@@ -99,6 +114,57 @@ export default function ReportPage({ go }: { go: (path: string) => void }) {
                   />
                 </label>
               </div>
+              <div className="upload evidence-upload">
+                <Icon name="flag" size={24} />
+                <span>
+                  <b>Tải lên bill hoặc ảnh đoạn chat</b>
+                  <small>PNG, JPG tối đa 10MB · Có thể chọn nhiều ảnh</small>
+                </span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  multiple
+                  onChange={(event) => {
+                    const files = Array.from(event.target.files ?? []).slice(
+                      0,
+                      10 - evidence.length,
+                    );
+                    setEvidence((items) => [
+                      ...items,
+                      ...files.map((file) => ({
+                        file,
+                        preview: URL.createObjectURL(file),
+                      })),
+                    ]);
+                    event.currentTarget.value = "";
+                  }}
+                  aria-label="Tải lên ảnh bằng chứng"
+                />
+              </div>
+              {evidence.length > 0 && (
+                <div className="evidence-preview-grid">
+                  {evidence.map((item, index) => (
+                    <div className="evidence-preview" key={item.preview}>
+                      <img
+                        src={item.preview}
+                        alt={`Xem trước bằng chứng ${index + 1}`}
+                      />
+                      <button
+                        type="button"
+                        aria-label={`Xóa ảnh bằng chứng ${index + 1}`}
+                        onClick={() => {
+                          URL.revokeObjectURL(item.preview);
+                          setEvidence((items) =>
+                            items.filter((current) => current !== item),
+                          );
+                        }}
+                      >
+                        <Icon name="x" size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="form-section">
               <h2>Nội dung tố cáo</h2>
@@ -110,7 +176,7 @@ export default function ReportPage({ go }: { go: (path: string) => void }) {
                   placeholder="Mô tả diễn biến sự việc..."
                 ></textarea>
               </label>
-              <div className="upload">
+              <div className="upload legacy-upload">
                 <Icon name="flag" size={24} />
                 <span>
                   <b>Tải lên bill hoặc ảnh đoạn chat</b>
@@ -120,6 +186,20 @@ export default function ReportPage({ go }: { go: (path: string) => void }) {
                   type="file"
                   accept="image/png,image/jpeg"
                   multiple
+                  onChange={(event) => {
+                    const files = Array.from(event.target.files ?? []).slice(
+                      0,
+                      10 - evidence.length,
+                    );
+                    setEvidence((items) => [
+                      ...items,
+                      ...files.map((file) => ({
+                        file,
+                        preview: URL.createObjectURL(file),
+                      })),
+                    ]);
+                    event.currentTarget.value = "";
+                  }}
                   aria-label="Tải lên ảnh bằng chứng"
                 />
               </div>

@@ -1,14 +1,62 @@
 import "dotenv/config";
+import fs from "node:fs";
+import path from "node:path";
 import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import multer from "multer";
 import nodemailer from "nodemailer";
 import { pool } from "./db";
 import { renderStatusEmail } from "./email";
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET ?? "change-this-secret-in-production";
+const cccdUploadDir = path.resolve(process.cwd(), "public/uploads/cccd");
+fs.mkdirSync(cccdUploadDir, { recursive: true });
+const evidenceUploadDir = path.resolve(
+  process.cwd(),
+  "public/uploads/evidence",
+);
+fs.mkdirSync(evidenceUploadDir, { recursive: true });
+const cccdUpload = multer({
+  storage: multer.diskStorage({
+    destination: cccdUploadDir,
+    filename: (_req, file, callback) => {
+      const extension = path.extname(file.originalname).toLowerCase();
+      callback(
+        null,
+        `${Date.now()}-${Math.random().toString(36).slice(2)}${extension}`,
+      );
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    callback(
+      null,
+      ["image/jpeg", "image/png", "image/webp"].includes(file.mimetype),
+    );
+  },
+});
+const evidenceUpload = multer({
+  storage: multer.diskStorage({
+    destination: evidenceUploadDir,
+    filename: (_req, file, callback) => {
+      const extension = path.extname(file.originalname).toLowerCase();
+      callback(
+        null,
+        `${Date.now()}-${Math.random().toString(36).slice(2)}${extension}`,
+      );
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024, files: 10 },
+  fileFilter: (_req, file, callback) => {
+    callback(
+      null,
+      ["image/jpeg", "image/png", "image/webp"].includes(file.mimetype),
+    );
+  },
+});
 const mailer =
   process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD
     ? nodemailer.createTransport({
@@ -46,6 +94,10 @@ async function sendStatusEmail(
 }
 app.use(cors());
 app.use(express.json());
+app.use(
+  "/uploads",
+  express.static(path.resolve(process.cwd(), "public/uploads")),
+);
 type AuthRequest = express.Request & {
   auth?: { id?: number; adminId?: number; role?: string; email?: string };
 };
@@ -298,7 +350,9 @@ app.patch("/api/admin/reports/:id", requireAdmin, async (req, res) => {
       status,
       req.params.id,
     ]);
-    const report = (rows as Array<{ reporterEmail?: string; scammerName?: string }>)[0];
+    const report = (
+      rows as Array<{ reporterEmail?: string; scammerName?: string }>
+    )[0];
     await sendStatusEmail(
       report?.reporterEmail,
       `Cập nhật tố cáo: ${status === "published" ? "đã được duyệt" : "đã bị từ chối"}`,
@@ -493,39 +547,95 @@ app.get("/api/scams", async (req, res) => {
     return res.status(503).json({ message: "Chưa kết nối được MySQL." });
   }
 });
-app.post("/api/admin-applications", async (req, res) => {
-  const { name, email, phone, services, introduction } = req.body as Record<
-    string,
-    string
-  >;
-  if (!/^\S+@\S+\.\S+$/.test(email))
-    return res.status(400).json({ message: "Email khÃ´ng há»£p lá»‡." });
-  if (!name || !email || !phone || !services || !introduction)
-    return res.status(400).json({ message: "Vui lòng điền đầy đủ thông tin." });
-  try {
-    await pool.execute(
-      "INSERT INTO admin_applications (name, email, phone, services, introduction) VALUES (?, ?, ?, ?, ?)",
-      [name, email, phone, services, introduction],
-    );
-    await sendStatusEmail(
+app.post(
+  "/api/admin-applications",
+  cccdUpload.fields([
+    { name: "cccdFront", maxCount: 1 },
+    { name: "cccdBack", maxCount: 1 },
+  ]),
+  async (req, res) => {
+    const {
+      name,
       email,
-      "Đã tiếp nhận đơn đăng ký admin",
-      `Xin chào ${name}, chúng tôi đã nhận được đơn đăng ký admin của bạn. Đơn đang chờ kiểm duyệt.`,
-    );
-    return res.status(201).json({ message: "Đã gửi yêu cầu đăng ký." });
-  } catch {
-    return res.status(503).json({ message: "Chưa kết nối được MySQL." });
-  }
-});
+      phone,
+      services,
+      websiteUrl,
+      bankName,
+      bankAccountNumber,
+      bankAccountHolder,
+      introduction,
+      cccdNumber,
+    } = req.body as Record<string, string>;
+    const uploadedFiles = req.files as {
+      cccdFront?: Express.Multer.File[];
+      cccdBack?: Express.Multer.File[];
+    };
+    const cccdFront = uploadedFiles?.cccdFront?.[0];
+    const cccdBack = uploadedFiles?.cccdBack?.[0];
+    if (!cccdNumber || !/^\d{9,12}$/.test(cccdNumber))
+      return res
+        .status(400)
+        .json({ message: "Số CCCD phải gồm 9 đến 12 chữ số." });
+    if (!cccdFront || !cccdBack)
+      return res
+        .status(400)
+        .json({ message: "Vui lòng tải đủ ảnh CCCD mặt trước và mặt sau." });
+    if (!/^\S+@\S+\.\S+$/.test(email))
+      return res.status(400).json({ message: "Email khÃ´ng há»£p lá»‡." });
+    if (
+      !name ||
+      !email ||
+      !phone ||
+      !services ||
+      !websiteUrl ||
+      !bankName ||
+      !bankAccountNumber ||
+      !bankAccountHolder ||
+      !introduction
+    )
+      return res
+        .status(400)
+        .json({ message: "Vui lòng điền đầy đủ thông tin." });
+    try {
+      await pool.execute(
+        "INSERT INTO admin_applications (name, email, phone, cccd_number, cccd_front_url, cccd_back_url, website_url, bank_name, bank_account_number, bank_account_holder, services, introduction) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+          name,
+          email,
+          phone,
+          cccdNumber,
+          `/uploads/cccd/${cccdFront.filename}`,
+          `/uploads/cccd/${cccdBack.filename}`,
+          websiteUrl,
+          bankName,
+          bankAccountNumber,
+          bankAccountHolder,
+          services,
+          introduction,
+        ],
+      );
+      await sendStatusEmail(
+        email,
+        "Đã tiếp nhận đơn đăng ký admin",
+        `Xin chào ${name}, chúng tôi đã nhận được đơn đăng ký admin của bạn. Đơn đang chờ kiểm duyệt.`,
+      );
+      return res.status(201).json({ message: "Đã gửi yêu cầu đăng ký." });
+    } catch {
+      return res.status(503).json({ message: "Chưa kết nối được MySQL." });
+    }
+  },
+);
 
 app.get("/api/admin/applications", requireAdmin, async (_req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT id, name, email, phone, services, introduction, status, created_at AS createdAt FROM admin_applications ORDER BY created_at DESC",
+      "SELECT id, name, email, phone, website_url AS websiteUrl, bank_name AS bankName, bank_account_number AS bankAccountNumber, bank_account_holder AS bankAccountHolder, services, introduction, status, created_at AS createdAt FROM admin_applications ORDER BY created_at DESC",
     );
     return res.json(rows);
   } catch {
-    return res.status(503).json({ message: "ChÆ°a káº¿t ná»‘i Ä‘Æ°á»£c MySQL." });
+    return res
+      .status(503)
+      .json({ message: "ChÆ°a káº¿t ná»‘i Ä‘Æ°á»£c MySQL." });
   }
 });
 
@@ -536,10 +646,10 @@ app.patch("/api/admin/applications/:id", requireAdmin, async (req, res) => {
       "SELECT name, email FROM admin_applications WHERE id = ? LIMIT 1",
       [req.params.id],
     );
-    await pool.execute("UPDATE admin_applications SET status = ? WHERE id = ?", [
-      status,
-      req.params.id,
-    ]);
+    await pool.execute(
+      "UPDATE admin_applications SET status = ? WHERE id = ?",
+      [status, req.params.id],
+    );
     const application = (rows as Array<{ name: string; email: string }>)[0];
     await sendStatusEmail(
       application?.email,
@@ -552,24 +662,12 @@ app.patch("/api/admin/applications/:id", requireAdmin, async (req, res) => {
   }
 });
 
-app.post("/api/reports", async (req, res) => {
-  try {
-    const {
-      scammerName,
-      accountNumber,
-      bankName,
-      amount,
-      phone,
-      category,
-      platform,
-      content,
-      reporterName,
-      reporterPhone,
-      reporterEmail,
-    } = req.body;
-    await pool.execute(
-      "INSERT INTO scam_reports (scammer_name, account_number, bank_name, amount, phone, category, platform, content, reporter_name, reporter_phone, reporter_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [
+app.post(
+  "/api/reports",
+  evidenceUpload.array("evidence", 10),
+  async (req, res) => {
+    try {
+      const {
         scammerName,
         accountNumber,
         bankName,
@@ -580,22 +678,46 @@ app.post("/api/reports", async (req, res) => {
         content,
         reporterName,
         reporterPhone,
-        reporterEmail || null,
-      ],
-    );
-    await sendStatusEmail(
-      reporterEmail,
-      "Đã tiếp nhận tố cáo",
-      `Tố cáo về "${scammerName}" đã được tiếp nhận và đang chờ kiểm duyệt.`,
-    );
-  } catch {
-    /* Keep the demo form usable without a local database. */
-  }
-  return res.status(201).json({
-    message: "Báo cáo đã được tiếp nhận và chờ kiểm duyệt.",
-    report: req.body,
-  });
-});
+        reporterEmail,
+      } = req.body;
+      const evidenceFiles =
+        (req.files as Express.Multer.File[] | undefined) ?? [];
+      const evidenceUrl = evidenceFiles.length
+        ? JSON.stringify(
+            evidenceFiles.map((file) => `/uploads/evidence/${file.filename}`),
+          )
+        : null;
+      await pool.execute(
+        "INSERT INTO scam_reports (scammer_name, account_number, bank_name, amount, phone, category, platform, evidence_url, content, reporter_name, reporter_phone, reporter_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+          scammerName,
+          accountNumber,
+          bankName,
+          amount,
+          phone,
+          category,
+          platform,
+          evidenceUrl,
+          content,
+          reporterName,
+          reporterPhone,
+          reporterEmail || null,
+        ],
+      );
+      await sendStatusEmail(
+        reporterEmail,
+        "Đã tiếp nhận tố cáo",
+        `Tố cáo về "${scammerName}" đã được tiếp nhận và đang chờ kiểm duyệt.`,
+      );
+    } catch {
+      /* Keep the demo form usable without a local database. */
+    }
+    return res.status(201).json({
+      message: "Báo cáo đã được tiếp nhận và chờ kiểm duyệt.",
+      report: req.body,
+    });
+  },
+);
 app.listen(Number(process.env.PORT ?? 3001), () =>
   console.log(`API running at http://localhost:${process.env.PORT ?? 3001}`),
 );

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Header } from "./components/SiteChrome";
 import HomePage from "./pages/HomePage";
 import ScamListPage from "./pages/ScamListPage";
@@ -16,18 +16,50 @@ import AdminRegistrationPage from "./pages/AdminRegistrationPage";
 import { pageFor } from "./routing";
 export default function App() {
   const [path, setPath] = useState(window.location.pathname);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const navigationTimer = useRef<number | null>(null);
   const go = (next: string) => {
+    if (next === path) return;
+    if (navigationTimer.current) window.clearTimeout(navigationTimer.current);
+    setIsNavigating(true);
     window.history.pushState({}, "", next);
     setPath(next);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    navigationTimer.current = window.setTimeout(() => {
+      setIsNavigating(false);
+      navigationTimer.current = null;
+    }, 420);
   };
-  window.onpopstate = () => setPath(window.location.pathname);
+  useEffect(
+    () => () => {
+      if (navigationTimer.current) window.clearTimeout(navigationTimer.current);
+    },
+    [],
+  );
+  window.onpopstate = () => {
+    setIsNavigating(true);
+    setPath(window.location.pathname);
+    if (navigationTimer.current) window.clearTimeout(navigationTimer.current);
+    navigationTimer.current = window.setTimeout(() => {
+      setIsNavigating(false);
+      navigationTimer.current = null;
+    }, 420);
+  };
   const page = pageFor(path);
   return (
     <>
       {page !== "admin" &&
         page !== "admin-login" &&
         page !== "admin-profile" && <Header path={path} go={go} />}
+      {isNavigating && (
+        <div className="route-loader" role="status" aria-live="polite">
+          <div className="route-loader-card">
+            <span className="route-loader-spinner" aria-hidden="true" />
+            <strong>Đang tải trang</strong>
+            <small>Vui lòng chờ một chút...</small>
+          </div>
+        </div>
+      )}
       {page === "home" && <HomePage go={go} />}
       {page === "middlemen" && <MiddlemanPage go={go} />}
       {page === "middleman-process" && <MiddlemanProcessPage go={go} />}

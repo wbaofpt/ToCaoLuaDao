@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/multer": "^2.2.0",
     "@types/nodemailer": "^8.0.2",
     "@vitejs/plugin-react": "latest",
     "bcryptjs": "^3.0.3",
@@ -20,6 +21,7 @@
     "dotenv": "^18.0.1",
     "express": "latest",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.4.0",
     "mysql2": "latest",
     "nodemailer": "^10.0.10",
     "react": "latest",

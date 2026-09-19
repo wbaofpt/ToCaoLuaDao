@@ -4,7 +4,13 @@ import { Footer } from "../components/SiteChrome";
 import { slugify } from "../data/scams";
 import { filterScams, paginate, type ScamListRow } from "../utils/scams";
 
-function Table({ go, rows }: { go: (path: string) => void; rows: ScamListRow[] }) {
+function Table({
+  go,
+  rows,
+}: {
+  go: (path: string) => void;
+  rows: ScamListRow[];
+}) {
   return (
     <div className="table-wrap">
       <table>
@@ -79,6 +85,7 @@ export default function ScamListPage({
   const [adminsLoaded, setAdminsLoaded] = useState(false);
   const [scamSearch, setScamSearch] = useState("");
   const [bankFilter, setBankFilter] = useState("all");
+  const [bankOpen, setBankOpen] = useState(false);
   const [scamPage, setScamPage] = useState(1);
   const [scams, setScams] = useState<ScamListRow[]>([]);
   const [scamsLoaded, setScamsLoaded] = useState(false);
@@ -173,6 +180,38 @@ export default function ScamListPage({
                   placeholder="Tìm tên, SĐT, số tài khoản, ngân hàng..."
                   aria-label="Tìm kiếm cảnh báo scam"
                 />
+              </div>
+              <div className="scam-custom-select">
+                <button
+                  type="button"
+                  className="scam-custom-select-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded={bankOpen}
+                  onClick={() => setBankOpen((open) => !open)}
+                >
+                  {bankFilter === "all" ? "Tất cả ngân hàng" : bankFilter}
+                  <Icon name="chevron" size={17} />
+                </button>
+                {bankOpen && (
+                  <div className="scam-custom-select-menu" role="listbox">
+                    {["all", ...bankOptions].map((bank) => (
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={bankFilter === bank}
+                        className={bankFilter === bank ? "selected" : ""}
+                        key={bank}
+                        onClick={() => {
+                          setBankFilter(bank);
+                          setScamPage(1);
+                          setBankOpen(false);
+                        }}
+                      >
+                        {bank === "all" ? "Tất cả ngân hàng" : bank}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <select
                 value={bankFilter}

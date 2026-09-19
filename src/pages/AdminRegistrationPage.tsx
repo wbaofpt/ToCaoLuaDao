@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Icon from "../components/Icon";
 import { Footer } from "../components/SiteChrome";
 
@@ -13,21 +13,42 @@ export default function AdminRegistrationPage({
     name: "",
     email: "",
     phone: "",
+    cccdNumber: "",
     services: "",
+    websiteUrl: "",
+    bankName: "",
+    bankAccountNumber: "",
+    bankAccountHolder: "",
     introduction: "",
   });
+  const [cccdFront, setCccdFront] = useState<File | null>(null);
+  const [cccdBack, setCccdBack] = useState<File | null>(null);
+  const [cccdFrontPreview, setCccdFrontPreview] = useState("");
+  const [cccdBackPreview, setCccdBackPreview] = useState("");
+  useEffect(
+    () => () => {
+      if (cccdFrontPreview) URL.revokeObjectURL(cccdFrontPreview);
+      if (cccdBackPreview) URL.revokeObjectURL(cccdBackPreview);
+    },
+    [cccdFrontPreview, cccdBackPreview],
+  );
   const update = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
     try {
+      const payload = new FormData();
+      Object.entries(form).forEach(([key, value]) =>
+        payload.append(key, value),
+      );
+      if (cccdFront) payload.append("cccdFront", cccdFront);
+      if (cccdBack) payload.append("cccdBack", cccdBack);
       const response = await fetch(
         "http://localhost:3001/api/admin-applications",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: payload,
         },
       );
       if (!response.ok) throw new Error("Không thể gửi yêu cầu đăng ký.");
@@ -106,6 +127,99 @@ export default function AdminRegistrationPage({
                     onChange={(e) => update("services", e.target.value)}
                   />
                 </label>
+                <label>
+                  Số CCCD
+                  <input
+                    required
+                    inputMode="numeric"
+                    pattern="[0-9]{9,12}"
+                    placeholder="Nhập 9–12 chữ số"
+                    value={form.cccdNumber}
+                    onChange={(e) => update("cccdNumber", e.target.value)}
+                  />
+                </label>
+                <label>
+                  URL liên hệ / website
+                  <input
+                    required
+                    type="url"
+                    placeholder="https://facebook.com/ten-cua-ban"
+                    value={form.websiteUrl}
+                    onChange={(e) => update("websiteUrl", e.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="identity-upload-grid">
+                <div className="identity-upload">
+                  <label className="identity-upload-title" htmlFor="cccd-front">
+                    Ảnh CCCD mặt trước *
+                  </label>
+                  {cccdFrontPreview && (
+                    <img
+                      src={cccdFrontPreview}
+                      alt="Xem trước CCCD mặt trước"
+                    />
+                  )}
+                  <div className="identity-file-row">
+                    <input
+                      id="cccd-front"
+                      className="identity-file-input"
+                      required
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        setCccdFront(file);
+                        setCccdFrontPreview(
+                          file ? URL.createObjectURL(file) : "",
+                        );
+                      }}
+                    />
+                    <label
+                      className="identity-file-button"
+                      htmlFor="cccd-front"
+                    >
+                      Choose File
+                    </label>
+                    <span className="identity-file-name">
+                      {cccdFront?.name ?? "Chưa chọn ảnh"}
+                    </span>
+                  </div>
+                  {!cccdFront && (
+                    <small>PNG, JPG hoặc WEBP · tối đa 10MB</small>
+                  )}
+                </div>
+                <div className="identity-upload">
+                  <label className="identity-upload-title" htmlFor="cccd-back">
+                    Ảnh CCCD mặt sau *
+                  </label>
+                  {cccdBackPreview && (
+                    <img src={cccdBackPreview} alt="Xem trước CCCD mặt sau" />
+                  )}
+                  <div className="identity-file-row">
+                    <input
+                      id="cccd-back"
+                      className="identity-file-input"
+                      required
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        setCccdBack(file);
+                        setCccdBackPreview(
+                          file ? URL.createObjectURL(file) : "",
+                        );
+                      }}
+                    />
+                    <label className="identity-file-button" htmlFor="cccd-back">
+                      Choose File
+                    </label>
+                    <span className="identity-file-name">
+                      {cccdBack?.name ?? "Chưa chọn ảnh"}
+                    </span>
+                  </div>
+                  {!cccdBack && <small>PNG, JPG hoặc WEBP · tối đa 10MB</small>}
+                </div>
               </div>
               <label>
                 Giới thiệu
@@ -117,6 +231,39 @@ export default function AdminRegistrationPage({
                   placeholder="Mô tả kinh nghiệm và cách bạn hỗ trợ giao dịch..."
                 />
               </label>
+              <h2 className="registration-subheading">Tài khoản ngân hàng</h2>
+              <div className="form-grid">
+                <label>
+                  Ngân hàng
+                  <input
+                    required
+                    placeholder="Ví dụ: MB Bank, VPBank"
+                    value={form.bankName}
+                    onChange={(e) => update("bankName", e.target.value)}
+                  />
+                </label>
+                <label>
+                  Số tài khoản
+                  <input
+                    required
+                    inputMode="numeric"
+                    value={form.bankAccountNumber}
+                    onChange={(e) =>
+                      update("bankAccountNumber", e.target.value)
+                    }
+                  />
+                </label>
+                <label>
+                  Tên chủ tài khoản
+                  <input
+                    required
+                    value={form.bankAccountHolder}
+                    onChange={(e) =>
+                      update("bankAccountHolder", e.target.value)
+                    }
+                  />
+                </label>
+              </div>
               {error && <p className="form-error">{error}</p>}
               <button className="primary submit-btn" type="submit">
                 Gửi yêu cầu đăng ký <Icon name="arrow" size={16} />

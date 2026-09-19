@@ -13,6 +13,10 @@ type Application = {
   name: string;
   email: string;
   phone: string;
+  websiteUrl: string;
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountHolder: string;
   services: string;
   status: string;
 };
@@ -52,7 +56,10 @@ export default function AdminDashboardPage({
       items.map((item) => (item.id === id ? { ...item, status } : item)),
     );
   };
-  const updateApplication = async (id: number, status: "approved" | "rejected") => {
+  const updateApplication = async (
+    id: number,
+    status: "approved" | "rejected",
+  ) => {
     await fetch(`http://localhost:3001/api/admin/applications/${id}`, {
       method: "PATCH",
       headers: {
@@ -187,14 +194,38 @@ export default function AdminDashboardPage({
                           : "Đã từ chối"}
                     </span>
                     <h3>{application.name}</h3>
-                    <p>{application.email} · {application.phone} · {application.services}</p>
+                    <p>
+                      {application.email} · {application.phone} ·{" "}
+                      {application.services} ·{" "}
+                      <a
+                        href={application.websiteUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Xem URL
+                      </a>
+                    </p>
+                    <p>
+                      {application.bankName} · {application.bankAccountNumber} ·{" "}
+                      {application.bankAccountHolder}
+                    </p>
                   </div>
                   {application.status === "pending" && (
                     <div className="admin-report-actions">
-                      <button className="approve" onClick={() => updateApplication(application.id, "approved")}>
+                      <button
+                        className="approve"
+                        onClick={() =>
+                          updateApplication(application.id, "approved")
+                        }
+                      >
                         <Icon name="check" size={15} /> Duyệt
                       </button>
-                      <button className="reject" onClick={() => updateApplication(application.id, "rejected")}>
+                      <button
+                        className="reject"
+                        onClick={() =>
+                          updateApplication(application.id, "rejected")
+                        }
+                      >
                         <Icon name="x" size={15} /> Từ chối
                       </button>
                     </div>
